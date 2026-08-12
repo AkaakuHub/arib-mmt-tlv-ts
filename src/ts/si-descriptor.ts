@@ -646,7 +646,7 @@ function readTSInformationDescriptor(buffer: Uint8Array): TSInformationDescripto
 }
 
 export type SIParameterDescriptor = {
-    tag: "siParameterDescriptor";
+    tag: "siParameter";
     parameterVersion: number;
     updateTime: number;
     tableParameters: SITableParameter[];
@@ -675,7 +675,7 @@ function readSIParameterDescriptor(buffer: Uint8Array): SIParameterDescriptor | 
         });
     }
     return {
-        tag: "siParameterDescriptor",
+        tag: "siParameter",
         parameterVersion,
         updateTime,
         tableParameters,
@@ -762,7 +762,7 @@ function readExtendedBroadcasterDescriptor(
 }
 
 export type ServiceDescriptor = {
-    tag: "serviceDescriptor";
+    tag: "service";
     serviceType: number;
     serviceProviderName: Uint8Array;
     serviceName: Uint8Array;
@@ -788,7 +788,7 @@ function readServiceDescriptor(buffer: Uint8Array): ServiceDescriptor | undefine
     }
     const serviceName = reader.slice(serviceNameLength);
     return {
-        tag: "serviceDescriptor",
+        tag: "service",
         serviceType,
         serviceProviderName,
         serviceName,
@@ -796,7 +796,7 @@ function readServiceDescriptor(buffer: Uint8Array): ServiceDescriptor | undefine
 }
 
 export type CAContractInfoDescriptor = {
-    tag: "caContractInfoDescriptor";
+    tag: "caContractInfo";
     caSystemId: number;
     caUnitId: number;
     components: number[];
@@ -838,7 +838,7 @@ function readCAContractInfoDescriptor(buffer: Uint8Array): CAContractInfoDescrip
     }
     const feeName = reader.slice(feeNameLength);
     return {
-        tag: "caContractInfoDescriptor",
+        tag: "caContractInfo",
         caSystemId,
         caUnitId,
         components,
@@ -1559,7 +1559,7 @@ function readLocalTimeOffsetDescriptor(buffer: Uint8Array): LocalTimeOffsetDescr
 }
 
 export type CableDeliverySystemDescriptor = {
-    tag: "cableDeliverySystemDescriptor";
+    tag: "cableDeliverySystem";
     frequency: number;
     frameType: number;
     fecOuter: number;
@@ -1585,7 +1585,7 @@ function readCableDeliverySystemDescriptor(
     const symbolRate = h2 >>> 4;
     const fecInner = h2 & 0xf;
     return {
-        tag: "cableDeliverySystemDescriptor",
+        tag: "cableDeliverySystem",
         frequency,
         frameType,
         fecOuter,
