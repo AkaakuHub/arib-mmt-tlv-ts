@@ -9,6 +9,7 @@ import {
     NetworkInformationSection,
     ProgramAssociationSection,
     ProgramMapSection,
+    SelectionInformationSection,
     ServiceDescriptionSection,
     StreamDescriptorSection,
     TimeOffsetSection,
@@ -21,6 +22,7 @@ export interface TSReaderEventMap {
     cdt: SIEvent<CommonDataSection>;
     tot: SIEvent<TimeOffsetSection>;
     bit: SIEvent<BroadcasterInformationSection>;
+    sit: SIEvent<SelectionInformationSection>;
     pat: SIEvent<ProgramAssociationSection>;
     pmt: SIEvent<ProgramMapSection>;
     dsmcc: SIEvent<

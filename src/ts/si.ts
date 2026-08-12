@@ -23,6 +23,8 @@ export const TABLE_ID_EIT_OTHER_SCHEDULE_EXTENDED_BEGIN = 0x68;
 export const TABLE_ID_EIT_OTHER_SCHEDULE_EXTENDED_END = 0x6f;
 export const TABLE_ID_ST = 0x72;
 export const TABLE_ID_TOT = 0x73;
+export const TABLE_ID_DIT = 0x7e;
+export const TABLE_ID_SIT = 0x7f;
 export const TABLE_ID_SDTT = 0xc3;
 export const TABLE_ID_BIT = 0xc4;
 export const TABLE_ID_NBIT_MSG = 0xc5;
@@ -44,7 +46,8 @@ export type Section =
     | DownloadDataBlockSection
     | StreamDescriptorSection
     | TimeOffsetSection
-    | CommonDataSection;
+    | CommonDataSection
+    | SelectionInformationSection;
 
 export function readSection(buffer: Uint8Array): Section | undefined {
     const reader = new BinaryReader(buffer);
@@ -105,6 +108,11 @@ export function readSection(buffer: Uint8Array): Section | undefined {
                 break;
             case TABLE_ID_TOT:
                 section = readTOT(payload);
+                break;
+            case TABLE_ID_DIT:
+                return undefined;
+            case TABLE_ID_SIT:
+                section = readSIT(payload);
                 break;
             default:
                 return undefined;
@@ -1085,5 +1093,66 @@ function readCDT(buffer: Uint8Array): CommonDataSection | undefined {
             logoVersion,
             data,
         },
+    };
+}
+
+export type SelectionInformationSection = {
+    tableId: "SIT";
+    versionNumber: number;
+    currentNextIndicator: boolean;
+    sectionNumber: number;
+    lastSectionNumber: number;
+    transmissionInfoDescriptors: Descriptor[];
+    services: SelectionInformationSectionService[];
+};
+
+export type SelectionInformationSectionService = {
+    serviceId: number;
+    runningStatus: number;
+    descriptors: Descriptor[];
+};
+
+function readSIT(buffer: Uint8Array): SelectionInformationSection | undefined {
+    const reader = new BinaryReader(buffer);
+    if (!reader.canRead(2 + 1 + 1 + 1 + 2)) {
+        return undefined;
+    }
+    reader.skip(2); // reserved_future_use
+    const h = reader.readUint8();
+    const versionNumber = (h >> 1) & 0x1f;
+    const currentNextIndicator = !!(h & 1);
+    const sectionNumber = reader.readUint8();
+    const lastSectionNumber = reader.readUint8();
+    const transmissionInfoLoopLength = reader.readUint16() & 0xfff;
+    if (!reader.canRead(transmissionInfoLoopLength)) {
+        return undefined;
+    }
+    const transmissionInfoDescriptors = readDescriptors(
+        reader.subarray(transmissionInfoLoopLength)
+    );
+    let services: SelectionInformationSectionService[] = [];
+    while (reader.canRead(2 + 2)) {
+        const serviceId = reader.readUint16();
+        const h = reader.readUint16();
+        const runningStatus = (h >> 12) & 7;
+        const serviceLoopLength = h & 0xfff;
+        if (!reader.canRead(transmissionInfoLoopLength)) {
+            return undefined;
+        }
+        const descriptors = readDescriptors(reader.subarray(serviceLoopLength));
+        services.push({
+            serviceId,
+            runningStatus,
+            descriptors,
+        });
+    }
+    return {
+        tableId: "SIT",
+        versionNumber,
+        currentNextIndicator,
+        sectionNumber,
+        lastSectionNumber,
+        transmissionInfoDescriptors,
+        services,
     };
 }

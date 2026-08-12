@@ -41,6 +41,8 @@ export const PID_SDTT = 0x0023;
 export const PID_SDTT_UPPER = 0x0028;
 export const PID_BIT = 0x0024;
 export const PID_CDT = 0x0029;
+export const PID_DIT = 0x001e;
+export const PID_SIT = 0x001f;
 
 export class SectionReader {
     eventTarget?: TSReaderEventTarget;
@@ -98,6 +100,13 @@ export class SectionReader {
                 if (section.tableId === "BIT") {
                     this.eventTarget?.dispatchEvent("bit", { pid, section });
                 }
+                break;
+            case PID_SIT:
+                if (section.tableId === "SIT") {
+                    this.eventTarget?.dispatchEvent("sit", { pid, section });
+                }
+                break;
+            case PID_DIT:
                 break;
             default:
                 if (section.tableId === "PMT") {

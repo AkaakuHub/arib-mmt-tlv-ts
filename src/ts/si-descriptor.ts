@@ -65,7 +65,11 @@ export type Descriptor =
     | LocalTimeOffsetDescriptor
     | CableDeliverySystemDescriptor
     | ChannelBondingCableDeliverySystemDescriptor
-    | StuffingDescriptor;
+    | StuffingDescriptor
+    | PartialTransportStreamDescriptor
+    | BroadcastIdDescriptor
+    | NetworkIdentificationDescriptor
+    | PartialTSTimeDescriptor;
 
 export const CA_DESCRIPTOR = 0x09;
 export const ACCESS_CONTROL_DESCRIPTOR = 0xf6;
@@ -106,6 +110,10 @@ export const LOCAL_TIME_OFFSET_DESCRIPTOR = 0x58;
 export const CABLE_DELIVERY_SYSTEM_DESCRIPTOR = 0x44;
 export const CHANNEL_BONDING_CABLE_DELIVERY_SYSTEM_DESCRIPTOR = 0xf3;
 export const STUFFING_DESCRIPTOR = 0x42;
+export const PARTIAL_TRANSPORT_STREAM_DESCRIPTOR = 0x63;
+export const BROADCAST_ID_DESCRIPTOR = 0x85;
+export const NETWORK_IDENTIFICATION_DESCRIPTOR = 0xc2;
+export const PARTIAL_TS_TIME_DESCRIPTOR = 0xc3;
 
 export function readDescriptors(buffer: Uint8Array): Descriptor[] {
     const descriptors: Descriptor[] = [];
@@ -235,6 +243,18 @@ export function readDescriptors(buffer: Uint8Array): Descriptor[] {
                 break;
             case STUFFING_DESCRIPTOR:
                 desc = readStuffingDescriptor(payload);
+                break;
+            case PARTIAL_TRANSPORT_STREAM_DESCRIPTOR:
+                desc = readPartialTransportStreamDescriptor(payload);
+                break;
+            case BROADCAST_ID_DESCRIPTOR:
+                desc = readBroadcastIdDescriptor(payload);
+                break;
+            case NETWORK_IDENTIFICATION_DESCRIPTOR:
+                desc = readNetworkIdentificationDescriptor(payload);
+                break;
+            case PARTIAL_TS_TIME_DESCRIPTOR:
+                desc = readPartialTSTimeDescriptor(payload);
                 break;
             default:
                 continue;
@@ -1601,4 +1621,126 @@ export type StuffingDescriptor = {
 
 function readStuffingDescriptor(_: Uint8Array): StuffingDescriptor {
     return { tag: "stuffing" };
+}
+
+export type PartialTransportStreamDescriptor = {
+    tag: "partialTransportStream";
+    peakRate: number;
+    minimumOverallSmoothingRate: number;
+    maximumOverallSmoothingBuffer: number;
+};
+
+function readPartialTransportStreamDescriptor(
+    buffer: Uint8Array
+): PartialTransportStreamDescriptor | undefined {
+    const reader = new BinaryReader(buffer);
+    if (!reader.canRead(8)) {
+        return undefined;
+    }
+    const peakRate = reader.readUint24() & 0x3fffff;
+    const minimumOverallSmoothingRate = reader.readUint24() & 0x3fffff;
+    const maximumOverallSmoothingBuffer = reader.readUint16() & 0x3fff;
+    return {
+        tag: "partialTransportStream",
+        peakRate,
+        minimumOverallSmoothingRate,
+        maximumOverallSmoothingBuffer,
+    };
+}
+
+export type BroadcastIdDescriptor = {
+    tag: "broadcastId";
+    originalNetworkId: number;
+    transportStreamId: number;
+    eventId: number;
+    broadcasterId: number;
+};
+
+function readBroadcastIdDescriptor(buffer: Uint8Array): BroadcastIdDescriptor | undefined {
+    const reader = new BinaryReader(buffer);
+    if (!reader.canRead(7)) {
+        return undefined;
+    }
+    const originalNetworkId = reader.readUint16();
+    const transportStreamId = reader.readUint16();
+    const eventId = reader.readUint16();
+    const broadcasterId = reader.readUint8();
+    return {
+        tag: "broadcastId",
+        originalNetworkId,
+        transportStreamId,
+        eventId,
+        broadcasterId,
+    };
+}
+
+export type NetworkIdentificationDescriptor = {
+    tag: "networkIdentification";
+    countryCode: number;
+    mediaType: number;
+    networkId: number;
+    privateData: Uint8Array;
+};
+
+function readNetworkIdentificationDescriptor(
+    buffer: Uint8Array
+): NetworkIdentificationDescriptor | undefined {
+    const reader = new BinaryReader(buffer);
+    if (!reader.canRead(7)) {
+        return undefined;
+    }
+    const countryCode = reader.readUint24();
+    const mediaType = reader.readUint16();
+    const networkId = reader.readUint16();
+    const privateData = reader.slice();
+    return {
+        tag: "networkIdentification",
+        countryCode,
+        mediaType,
+        networkId,
+        privateData,
+    };
+}
+
+export type PartialTSTimeDescriptor = {
+    tag: "partialTSTime";
+    eventVersionNumber: number;
+    eventStartTime: number | undefined;
+    duration: number | undefined;
+    offset: number;
+    offsetFlag: boolean;
+    otherDescriptorStatus: boolean;
+    jstTime: number | undefined;
+};
+
+function readPartialTSTimeDescriptor(buffer: Uint8Array): PartialTSTimeDescriptor | undefined {
+    const reader = new BinaryReader(buffer);
+    if (!reader.canRead(13)) {
+        return undefined;
+    }
+    const eventVersionNumber = reader.readUint8();
+    const eventStartTime = reader.readUint40();
+    const duration = reader.readUint24();
+    const offset = reader.readUint24();
+    const h = reader.readUint8();
+    const offsetFlag = !!(h & 4);
+    const otherDescriptorStatus = !!(h & 2);
+    const jstTimeFlag = !!(h & 1);
+    let jstTime: number | undefined;
+    if (jstTimeFlag) {
+        if (!reader.canRead(5)) {
+            return undefined;
+        }
+        jstTime = reader.readUint40();
+    }
+    return {
+        tag: "partialTSTime",
+        eventVersionNumber,
+        eventStartTime: eventStartTime === 0xffffffffff ? undefined : eventStartTime,
+        duration: duration === 0xffffff ? undefined : duration,
+        offset,
+        offsetFlag,
+        otherDescriptorStatus,
+        jstTime,
+    };
 }
