@@ -48,16 +48,16 @@ export function calculateCRC32(data: Uint8Array, crc: number) {
         setupCRC32Table();
     }
     let i = 0;
-    for (; i < data.length; i += 4) {
-        const d1 = data[i];
-        const d2 = data[i + 1];
-        const d3 = data[i + 2];
-        const d4 = data[i + 3];
+    for (; i + 4 <= data.length; i += 4) {
+        const d0 = data[i];
+        const d1 = data[i + 1];
+        const d2 = data[i + 2];
+        const d3 = data[i + 3];
         crc =
-            crc32Table3[d1 ^ (crc >>> 24)] ^
-            crc32Table2[d2 ^ ((crc >>> 16) & 0xff)] ^
-            crc32Table1[d3 ^ ((crc >>> 8) & 0xff)] ^
-            crc32Table0[d4 ^ (crc & 0xff)];
+            crc32Table3[d0 ^ (crc >>> 24)] ^
+            crc32Table2[d1 ^ ((crc >>> 16) & 0xff)] ^
+            crc32Table1[d2 ^ ((crc >>> 8) & 0xff)] ^
+            crc32Table0[d3 ^ (crc & 0xff)];
     }
     for (; i < data.length; i += 1) {
         crc = (crc << 8) ^ crc32Table[data[i] ^ (crc >>> 24)];
