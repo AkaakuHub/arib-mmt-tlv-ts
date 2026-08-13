@@ -1081,7 +1081,7 @@ function readStreamDescriptorSection(buffer: Uint8Array): StreamDescriptorSectio
     }
     const h0 = reader.readUint16();
     const dataEventId = h0 >> 12;
-    const eventMessageGroupId = h0 & 15;
+    const eventMessageGroupId = h0 & 0xfff;
     const h = reader.readUint8();
     const versionNumber = (h >> 1) & 0x1f;
     const currentNextIndicator = !!(h & 1);
