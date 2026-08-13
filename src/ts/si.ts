@@ -318,6 +318,9 @@ export function readNIT(
     }
     const networkDescriptors = readDescriptors(reader.subarray(networkDescriptorLength));
     const transportStreams: TransportStream[] = [];
+    if (!reader.canRead(2)) {
+        return undefined;
+    }
     const transportStreamLoopLength = reader.readUint16() & 0xfff;
     if (!reader.canRead(transportStreamLoopLength)) {
         return undefined;
@@ -633,6 +636,9 @@ export type DSMCCDownloadDataHeader = {
 function readDSMCCMessageHeader(
     reader: BinaryReader
 ): [DSMCCMessageHeader, Uint8Array] | undefined {
+    if (!reader.canRead(1 + 1 + 2 + 4 + 1 + 1 + 2)) {
+        return undefined;
+    }
     const protocolDiscriminator = reader.readUint8();
     const dsmccType = reader.readUint8();
     const messageId = reader.readUint16();
@@ -675,6 +681,9 @@ function readDSMCCMessageHeader(
 function readDSMCCDownloadDataHeader(
     reader: BinaryReader
 ): [DSMCCDownloadDataHeader, Uint8Array] | undefined {
+    if (!reader.canRead(1 + 1 + 2 + 4 + 1 + 1 + 2)) {
+        return undefined;
+    }
     const protocolDiscriminator = reader.readUint8();
     const dsmccType = reader.readUint8();
     const messageId = reader.readUint16();
@@ -1369,7 +1378,7 @@ function readSIT(buffer: Uint8Array): SelectionInformationSection | undefined {
         const h = reader.readUint16();
         const runningStatus = (h >> 12) & 7;
         const serviceLoopLength = h & 0xfff;
-        if (!reader.canRead(transmissionInfoLoopLength)) {
+        if (!reader.canRead(serviceLoopLength)) {
             return undefined;
         }
         const descriptors = readDescriptors(reader.subarray(serviceLoopLength));

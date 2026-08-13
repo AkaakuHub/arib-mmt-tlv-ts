@@ -693,6 +693,9 @@ function readSIParameterDescriptor(buffer: Uint8Array): SIParameterDescriptor | 
     while (reader.canRead(1 + 1)) {
         const tableId = reader.readUint8();
         const tableDescriptionLength = reader.readUint8();
+        if (!reader.canRead(tableDescriptionLength)) {
+            return undefined;
+        }
         const tableDescription = reader.slice(tableDescriptionLength);
         tableParameters.push({
             tableId,
@@ -747,6 +750,9 @@ function readExtendedBroadcasterDescriptor(
     }
     const broadcasterType = reader.readUint8() >> 4;
     if (broadcasterType === 0x1) {
+        if (!reader.canRead(2 + 1)) {
+            return undefined;
+        }
         const terrestrialBroadcasterId = reader.readUint16();
         const h = reader.readUint8();
         const numberOfAffiliationIdLoop = h >> 4;
