@@ -492,6 +492,11 @@ function readHierarchicalTransmissionDescriptor(
     }
     const qualityLevel = !!(reader.readUint8() & 1);
     const referencePID = reader.readUint16() & 0x1fff;
+    return {
+        tag: "hierarchicalTransmission",
+        qualityLevel,
+        referencePID,
+    };
 }
 
 export type DataComponentDescriptor = {
