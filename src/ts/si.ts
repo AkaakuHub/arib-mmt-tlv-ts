@@ -136,10 +136,11 @@ export type ProgramAssociationSection = {
 
 export type Program =
     | {
-          programNumber: 0x0000;
+          type: "networkPID";
           networkPID: number;
       }
     | {
+          type: "program";
           programNumber: number;
           programMapPID: number;
       };
@@ -160,11 +161,12 @@ export function readPAT(buffer: Uint8Array): ProgramAssociationSection | undefin
         const programNumber = reader.readUint16();
         if (programNumber === 0) {
             programs.push({
-                programNumber,
+                type: "networkPID",
                 networkPID: reader.readUint16() & 0x1fff,
             });
         } else {
             programs.push({
+                type: "program",
                 programNumber,
                 programMapPID: reader.readUint16() & 0x1fff,
             });

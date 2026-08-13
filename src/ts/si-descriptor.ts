@@ -721,7 +721,7 @@ export type ExtendedBroadcasterDescriptor =
       }
     | {
           tag: "extendedBroadcaster";
-          broadcasterType: 0x1;
+          broadcasterType: "terrestrial";
           terrestrialBroadcasterId: number;
           affiliationIdList: number[];
           broadcasters: ExtendedBroadcasterDescriptorBroadcaster[];
@@ -769,10 +769,11 @@ function readExtendedBroadcasterDescriptor(
         const privateData = reader.slice();
         return {
             tag: "extendedBroadcaster",
-            broadcasterType,
+            broadcasterType: "terrestrial",
             terrestrialBroadcasterId,
             affiliationIdList,
             broadcasters,
+            privateData,
         };
     }
     return {
