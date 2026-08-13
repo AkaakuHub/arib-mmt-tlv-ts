@@ -77,7 +77,7 @@ export class TSReader {
         this.sectionReader.push(tsPacket);
     }
     push(block: Uint8Array) {
-        const offset = this.bytes_ - this.buffer.length;
+        let offset = this.bytes_ - this.buffer.length;
         this.bytes_ += block.length;
         const buffer = new Uint8Array(this.buffer.length + block.length);
         buffer.set(this.buffer);
@@ -99,10 +99,10 @@ export class TSReader {
         }
         while (this.buffer.length - packetOffset >= packetSize) {
             const packet = this.buffer.subarray(packetOffset, packetOffset + 188);
-            packetOffset += packetSize;
             if (packet[0] != TS_SYNC_BYTE) {
+                packetOffset += 1;
+                offset += packetOffset;
                 this.buffer = this.buffer.subarray(packetOffset);
-                packetOffset = 0;
                 const result = resync(this.buffer, this.minSyncCount);
                 if (result == null) {
                     if (this.buffer.length > this.minSyncCount * 204 * 2) {
@@ -116,6 +116,7 @@ export class TSReader {
                 continue;
             }
             this.processPacket(offset + packetOffset, packet);
+            packetOffset += packetSize;
         }
         this.buffer = this.buffer.slice(packetOffset);
     }
