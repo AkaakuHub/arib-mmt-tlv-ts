@@ -63,7 +63,6 @@ export class SectionReader {
             return false;
         }
         let payload = concatBuffers(buffer.payloads);
-        let sectionCount = 0;
         while (payload.length > 3) {
             const tableId = payload[0];
             if (tableId === 0xff) {
@@ -78,12 +77,8 @@ export class SectionReader {
             if (sectionLength + 3 > payload.length) {
                 break;
             }
-            if (sectionCount >= 2) {
-                console.error("sectionCount >= 2", sectionCount);
-            }
             this.pushSection(pid, payload.subarray(0, sectionLength + 3));
             payload = payload.subarray(sectionLength + 3);
-            sectionCount++;
         }
         buffer.receivedLength = payload.length;
         if (payload.length === 0) {
