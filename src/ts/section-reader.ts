@@ -1,33 +1,13 @@
-import { BinaryReader, concatBuffers } from "../utils";
+import { concatBuffers } from "../utils";
 import { TSReaderEventTarget } from "./event";
 import { TSPacket } from "./packet";
 import { readSection } from "./si";
 
 type SectionBuffer = {
     continuityCounter: number;
-    sectionLength: number;
     receivedLength: number;
     payloads: Uint8Array[];
 };
-
-function getSectionLength(payload: Uint8Array): number | undefined {
-    if (payload.length < 3) {
-        return undefined;
-    }
-    if (payload[0] === 0x00 && payload[1] === 0x00 && payload[2] === 0x01) {
-        return undefined; // PES
-    }
-    const pointer = payload[0] + 1;
-    if (payload.length <= pointer + 2) {
-        return undefined;
-    }
-    const reserved = (payload[pointer + 1] >> 4) & 3;
-    if (reserved != 3) {
-        return undefined;
-    }
-    const sectionLength = ((payload[pointer + 1] << 8) | payload[pointer + 2]) & 0xfff;
-    return sectionLength;
-}
 
 export const PID_PAT = 0x0000;
 export const PID_CAT = 0x0001;
@@ -56,7 +36,65 @@ export class SectionReader {
     close() {
         delete this.eventTarget;
     }
-    processSection(pid: number, payload: Uint8Array) {
+
+    private pushSectionFragment(pid: number, buffer: SectionBuffer, fragment: Uint8Array): boolean {
+        if (fragment.length === 0) {
+            return false;
+        }
+        buffer.receivedLength += fragment.length;
+        buffer.payloads.push(fragment);
+        const tableId = buffer.payloads[0][0];
+        if (tableId === 0xff) {
+            // stuffing
+            return true;
+        }
+        if (buffer.payloads[0].length < 3) {
+            buffer.payloads = [concatBuffers(buffer.payloads)];
+            if (buffer.payloads[0].length < 3) {
+                return false;
+            }
+        }
+        // reserved
+        if (((buffer.payloads[0][1] >> 4) & 3) !== 3) {
+            return true;
+        }
+        const firstSectionLength = ((buffer.payloads[0][1] << 8) | buffer.payloads[0][2]) & 0xfff;
+        if (firstSectionLength + 3 > buffer.receivedLength) {
+            return false;
+        }
+        let payload = concatBuffers(buffer.payloads);
+        let sectionCount = 0;
+        while (payload.length > 3) {
+            const tableId = payload[0];
+            if (tableId === 0xff) {
+                // stuffing
+                return true;
+            }
+            // reserved
+            if (((payload[1] >> 4) & 3) !== 3) {
+                return true;
+            }
+            const sectionLength = ((payload[1] << 8) | payload[2]) & 0xfff;
+            if (sectionLength + 3 > payload.length) {
+                break;
+            }
+            if (sectionCount >= 2) {
+                console.error("sectionCount >= 2", sectionCount);
+            }
+            this.pushSection(pid, payload.subarray(0, sectionLength + 3));
+            payload = payload.subarray(sectionLength + 3);
+            sectionCount++;
+        }
+        buffer.receivedLength = payload.length;
+        if (payload.length === 0) {
+            buffer.payloads = [];
+        } else {
+            buffer.payloads = [payload];
+        }
+        return false;
+    }
+
+    pushSection(pid: number, payload: Uint8Array) {
         const section = readSection(payload);
         if (section == null) {
             return;
@@ -127,28 +165,29 @@ export class SectionReader {
         let buffer = this.buffer.get(packet.pid);
         const payload = packet.data.subarray(packet.payloadOffset);
         if (packet.payloadUnitStartIndicator) {
-            const sectionLength = getSectionLength(payload);
             this.buffer.delete(packet.pid);
             const pointer = payload[0] + 1;
-            if (buffer != null) {
-                const p = payload.subarray(1, pointer);
-                buffer.payloads.push(p);
-                buffer.receivedLength += p.length;
-                if (buffer.receivedLength >= buffer.sectionLength + 3) {
-                    this.processSection(packet.pid, concatBuffers(buffer.payloads));
-                    this.buffer.delete(packet.pid);
-                }
+            if (payload[0] === 0x00 && payload[1] === 0x00 && payload[2] === 0x01) {
+                return; // PES
             }
-            if (sectionLength == null) {
-                return;
+            if (
+                buffer != null &&
+                ((buffer.continuityCounter + 1) & 15) === packet.continuityCounter
+            ) {
+                const p = payload.subarray(1, pointer);
+                if (p.length > 0) {
+                    this.pushSectionFragment(packet.pid, buffer, p);
+                }
             }
             buffer = {
                 continuityCounter: packet.continuityCounter,
-                sectionLength,
-                receivedLength: payload.length - pointer,
-                payloads: [payload.slice(pointer)],
+                receivedLength: 0,
+                payloads: [],
             };
             this.buffer.set(packet.pid, buffer);
+            if (this.pushSectionFragment(packet.pid, buffer, payload.slice(pointer))) {
+                this.buffer.delete(packet.pid);
+            }
         } else {
             if (buffer == null) {
                 return;
@@ -163,12 +202,9 @@ export class SectionReader {
                 return;
             }
             buffer.continuityCounter = packet.continuityCounter;
-            buffer.payloads.push(payload);
-            buffer.receivedLength += payload.length;
-        }
-        if (buffer.receivedLength >= buffer.sectionLength + 3) {
-            this.processSection(packet.pid, concatBuffers(buffer.payloads));
-            this.buffer.delete(packet.pid);
+            if (this.pushSectionFragment(packet.pid, buffer, payload)) {
+                this.buffer.delete(packet.pid);
+            }
         }
     }
 }
