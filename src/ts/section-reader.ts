@@ -52,6 +52,8 @@ export class SectionReader {
     buffer: Map<number, SectionBuffer> = new Map();
     reset() {
         this.buffer.clear();
+    }
+    close() {
         delete this.eventTarget;
     }
     processSection(pid: number, payload: Uint8Array) {

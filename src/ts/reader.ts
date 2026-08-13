@@ -32,6 +32,7 @@ export class TSReader {
 
     close() {
         delete this.eventTarget;
+        this.sectionReader.close();
     }
 
     reset() {
