@@ -5,6 +5,7 @@
     "exports": {
         ".": "./dist/index.js",
         "./utils.js": "./dist/utils.js",
+        "./crc-32.js": "./dist/crc-32.js",
         "./mmt-si-descriptor.js": "./dist/mmt-si-descriptor.js",
         "./mmt-si.js": "./dist/mmt-si.js",
         "./tlv.js": "./dist/tlv.js",

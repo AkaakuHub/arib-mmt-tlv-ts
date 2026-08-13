@@ -1,3 +1,4 @@
+import { calculateCRC32 } from "../crc-32";
 import { BinaryReader } from "../utils";
 import { Descriptor, readDescriptors } from "./si-descriptor";
 
@@ -62,6 +63,9 @@ export function readSection(buffer: Uint8Array): Section | undefined {
     }
     const payload = reader.subarray(sectionLength - 4 /* CRC_32 or checksum */);
     const crc32 = reader.readUint32();
+    if (calculateCRC32(buffer.subarray(0, sectionLength + 3), -1) !== 0) {
+        return undefined;
+    }
     let section: Section | undefined;
     if (tableId >= TABLE_ID_EIT_ACTUAL_PF && tableId <= TABLE_ID_EIT_OTHER_SCHEDULE_EXTENDED_END) {
         section = readEIT(tableId, payload);
