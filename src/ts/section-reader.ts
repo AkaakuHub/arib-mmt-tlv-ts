@@ -123,12 +123,13 @@ export class SectionReader {
     }
     push(packet: TSPacket) {
         let buffer = this.buffer.get(packet.pid);
+        const payload = packet.data.subarray(packet.payloadOffset);
         if (packet.payloadUnitStartIndicator) {
-            const sectionLength = getSectionLength(packet.payload);
+            const sectionLength = getSectionLength(payload);
             this.buffer.delete(packet.pid);
-            const pointer = packet.payload[0] + 1;
+            const pointer = payload[0] + 1;
             if (buffer != null) {
-                const p = packet.payload.subarray(1, pointer);
+                const p = payload.subarray(1, pointer);
                 buffer.payloads.push(p);
                 buffer.receivedLength += p.length;
                 if (buffer.receivedLength >= buffer.sectionLength + 3) {
@@ -139,12 +140,11 @@ export class SectionReader {
             if (sectionLength == null) {
                 return;
             }
-            const payload = packet.payload.slice(pointer);
             buffer = {
                 continuityCounter: packet.continuityCounter,
                 sectionLength,
                 receivedLength: payload.length,
-                payloads: [payload],
+                payloads: [payload.slice(pointer)],
             };
             this.buffer.set(packet.pid, buffer);
         } else {
@@ -161,8 +161,8 @@ export class SectionReader {
                 return;
             }
             buffer.continuityCounter = packet.continuityCounter;
-            buffer.payloads.push(packet.payload);
-            buffer.receivedLength += packet.payload.length;
+            buffer.payloads.push(payload);
+            buffer.receivedLength += payload.length;
         }
         if (buffer.receivedLength >= buffer.sectionLength + 3) {
             this.processSection(packet.pid, concatBuffers(buffer.payloads));

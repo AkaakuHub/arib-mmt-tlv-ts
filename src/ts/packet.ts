@@ -6,5 +6,6 @@ export type TSPacket = {
     transportScramblingControl: number;
     adaptationFieldControl: number;
     continuityCounter: number;
-    payload: Uint8Array;
+    payloadOffset: number;
+    data: Uint8Array;
 };

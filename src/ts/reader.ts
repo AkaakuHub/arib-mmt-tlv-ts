@@ -56,13 +56,6 @@ export class TSReader {
             const adaptationFieldLength = packet[4];
             payloadOffset += 1 + adaptationFieldLength;
         }
-        if (transportScramblingControl !== 0) {
-            return;
-        }
-        if (adaptationFieldControl !== 0b01 && adaptationFieldControl !== 0b11) {
-            return;
-        }
-        const payload = packet.subarray(payloadOffset);
         const tsPacket: TSPacket = {
             transportErrorIndicator,
             payloadUnitStartIndicator,
@@ -71,9 +64,16 @@ export class TSReader {
             transportScramblingControl,
             adaptationFieldControl,
             continuityCounter,
-            payload,
+            data: packet,
+            payloadOffset,
         };
         this.eventTarget?.dispatchEvent("packet", { offset, packet: tsPacket });
+        if (transportScramblingControl !== 0) {
+            return;
+        }
+        if (adaptationFieldControl !== 0b01 && adaptationFieldControl !== 0b11) {
+            return;
+        }
         this.sectionReader.push(tsPacket);
     }
     push(block: Uint8Array) {
