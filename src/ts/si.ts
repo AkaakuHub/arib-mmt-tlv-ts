@@ -379,7 +379,7 @@ export function readBIT(buffer: Uint8Array): BroadcasterInformationSection | und
     const firstDescriptors = readDescriptors(reader.subarray(firstDescriptorsLength));
     const broadcasters: Broadcaster[] = [];
     while (reader.canRead(1 + 2)) {
-        const broadcasterId = reader.readUint16();
+        const broadcasterId = reader.readUint8();
         const broadcasterDescriptorsLength = reader.readUint16() & 0xfff;
         if (!reader.canRead(broadcasterDescriptorsLength)) {
             break;
