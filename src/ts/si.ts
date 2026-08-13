@@ -241,7 +241,7 @@ export function readPMT(buffer: Uint8Array): ProgramMapSection | undefined {
     if (!reader.canRead(2 + 1 + 1 + 1 + 2 + 2)) {
         return undefined;
     }
-    const programNumber = reader.readUint16() & 0xfff;
+    const programNumber = reader.readUint16();
     const h = reader.readUint8();
     const versionNumber = (h >> 1) & 0x1f;
     const currentNextIndicator = !!(h & 1);
