@@ -86,12 +86,13 @@ export function readEmergencyInformationDescriptor(
         const startEndFlag = !!(h & 0x80);
         const signalLevel = !!(h & 0x40);
         const areaCodeLength = reader.readUint8();
-        if (!reader.canRead(2 * areaCodeLength)) {
+        if (!reader.canRead(areaCodeLength)) {
             break;
         }
+        const areaReader = new BinaryReader(reader.subarray(areaCodeLength));
         const areaCodes: number[] = [];
-        for (let i = 0; i < areaCodeLength; i++) {
-            areaCodes.push(reader.readUint16() >> 4);
+        while (areaReader.canRead(2)) {
+            areaCodes.push(areaReader.readUint16() >> 4);
         }
         services.push({
             serviceId,
