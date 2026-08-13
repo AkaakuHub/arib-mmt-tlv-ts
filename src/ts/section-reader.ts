@@ -143,7 +143,7 @@ export class SectionReader {
             buffer = {
                 continuityCounter: packet.continuityCounter,
                 sectionLength,
-                receivedLength: payload.length,
+                receivedLength: payload.length - pointer,
                 payloads: [payload.slice(pointer)],
             };
             this.buffer.set(packet.pid, buffer);
