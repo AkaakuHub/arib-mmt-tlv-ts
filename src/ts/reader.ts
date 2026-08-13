@@ -39,6 +39,7 @@ export class TSReader {
         this.buffer = new Uint8Array(0);
         this.sectionReader.reset();
         this.bytes_ = 0;
+        delete this.packetSize;
     }
 
     private processPacket(offset: number, packet: Uint8Array) {
@@ -128,7 +129,7 @@ function resync(
     minSyncCount: number
 ): { packetSize: number; packetOffset: number } | undefined {
     for (const packetSize of [188, 192, 204]) {
-        for (let offset = 0; offset + packetSize * minSyncCount < buffer.length; offset++) {
+        for (let offset = 0; offset + packetSize * minSyncCount <= buffer.length; offset++) {
             let synced = true;
             for (let count = 0; count < minSyncCount; count++) {
                 if (buffer[offset + count * packetSize] != TS_SYNC_BYTE) {
