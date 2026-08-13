@@ -561,11 +561,11 @@ function readEIT(tableId: number, buffer: Uint8Array): EventInformationSection |
     } else if (tableId === TABLE_ID_EIT_OTHER_PF) {
         tableIndex = 0;
         other = true;
-    } else if (tableId <= TABLE_ID_EIT_ACTUAL_SCHEDULE_BASIC_BEGIN) {
+    } else if (tableId <= TABLE_ID_EIT_ACTUAL_SCHEDULE_BASIC_END) {
         tableIndex = tableId - TABLE_ID_EIT_ACTUAL_SCHEDULE_BASIC_BEGIN;
-    } else if (tableId <= TABLE_ID_EIT_ACTUAL_SCHEDULE_EXTENDED_BEGIN) {
+    } else if (tableId <= TABLE_ID_EIT_ACTUAL_SCHEDULE_EXTENDED_END) {
         tableIndex = tableId - TABLE_ID_EIT_ACTUAL_SCHEDULE_EXTENDED_BEGIN;
-    } else if (tableId <= TABLE_ID_EIT_OTHER_SCHEDULE_BASIC_BEGIN) {
+    } else if (tableId <= TABLE_ID_EIT_OTHER_SCHEDULE_BASIC_END) {
         other = true;
         tableIndex = tableId - TABLE_ID_EIT_OTHER_SCHEDULE_BASIC_BEGIN;
     } else {
@@ -577,11 +577,11 @@ function readEIT(tableId: number, buffer: Uint8Array): EventInformationSection |
         lastTableIndex = 0;
     } else if (tableId === TABLE_ID_EIT_OTHER_PF) {
         lastTableIndex = 0;
-    } else if (tableId <= TABLE_ID_EIT_ACTUAL_SCHEDULE_BASIC_BEGIN) {
+    } else if (tableId <= TABLE_ID_EIT_ACTUAL_SCHEDULE_BASIC_END) {
         lastTableIndex = lastTableId - TABLE_ID_EIT_ACTUAL_SCHEDULE_BASIC_BEGIN;
-    } else if (tableId <= TABLE_ID_EIT_ACTUAL_SCHEDULE_EXTENDED_BEGIN) {
+    } else if (tableId <= TABLE_ID_EIT_ACTUAL_SCHEDULE_EXTENDED_END) {
         lastTableIndex = lastTableId - TABLE_ID_EIT_ACTUAL_SCHEDULE_EXTENDED_BEGIN;
-    } else if (tableId <= TABLE_ID_EIT_OTHER_SCHEDULE_BASIC_BEGIN) {
+    } else if (tableId <= TABLE_ID_EIT_OTHER_SCHEDULE_BASIC_END) {
         lastTableIndex = lastTableId - TABLE_ID_EIT_OTHER_SCHEDULE_BASIC_BEGIN;
     } else {
         lastTableIndex = lastTableId - TABLE_ID_EIT_OTHER_SCHEDULE_EXTENDED_BEGIN;
