@@ -58,7 +58,7 @@ export function readSection(buffer: Uint8Array): Section | undefined {
     const tableId = reader.readUint8();
     const h = reader.readUint16();
     const sectionLength = h & 0xfff;
-    if (!reader.canRead(sectionLength)) {
+    if (sectionLength < 4 || !reader.canRead(sectionLength)) {
         return undefined;
     }
     const payload = reader.subarray(sectionLength - 4 /* CRC_32 or checksum */);
