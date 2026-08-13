@@ -326,6 +326,9 @@ function decodeCharacter(state: DecoderState, data: Uint8Array, i: number): numb
                 return i;
             }
             const second = (data[i] & 0x7f) - 0x20;
+            if (second < 1 || second > 94) {
+                return i;
+            }
             i++;
             writeDBCS(state, state.graphicsSet[state.graphicsRight], first, second);
         } else {
