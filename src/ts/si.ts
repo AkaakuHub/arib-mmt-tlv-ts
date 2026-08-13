@@ -606,7 +606,7 @@ function readEIT(tableId: number, buffer: Uint8Array): EventInformationSection |
     };
 }
 
-export type DSMCCDownloadDataHeader = {
+export type DSMCCMessageHeader = {
     protocolDiscriminator: number;
     dsmccType: number;
     messageId: number;
@@ -616,9 +616,19 @@ export type DSMCCDownloadDataHeader = {
     adaptationData?: Uint8Array;
 };
 
-function readDSMCCDownloadDataHeader(
+export type DSMCCDownloadDataHeader = {
+    protocolDiscriminator: number;
+    dsmccType: number;
+    messageId: number;
+    downloadId: number;
+    /** always undefined */
+    adaptationType?: number;
+    adaptationData?: Uint8Array;
+};
+
+function readDSMCCMessageHeader(
     reader: BinaryReader
-): [DSMCCDownloadDataHeader, Uint8Array] | undefined {
+): [DSMCCMessageHeader, Uint8Array] | undefined {
     const protocolDiscriminator = reader.readUint8();
     const dsmccType = reader.readUint8();
     const messageId = reader.readUint16();
@@ -658,6 +668,48 @@ function readDSMCCDownloadDataHeader(
     ];
 }
 
+function readDSMCCDownloadDataHeader(
+    reader: BinaryReader
+): [DSMCCDownloadDataHeader, Uint8Array] | undefined {
+    const protocolDiscriminator = reader.readUint8();
+    const dsmccType = reader.readUint8();
+    const messageId = reader.readUint16();
+    const downloadId = reader.readUint32();
+    reader.skip(1);
+    const adaptationLength = reader.readUint8();
+    const messageLength = reader.readUint16();
+    if (messageLength < adaptationLength) {
+        return undefined;
+    }
+    if (!reader.canRead(messageLength)) {
+        return undefined;
+    }
+    if (adaptationLength > 0) {
+        const adaptationType = reader.readUint8();
+        const adaptationData = reader.slice(adaptationLength - 1);
+        return [
+            {
+                protocolDiscriminator,
+                dsmccType,
+                messageId,
+                downloadId,
+                adaptationType,
+                adaptationData,
+            },
+            reader.subarray(messageLength - adaptationLength),
+        ];
+    }
+    return [
+        {
+            protocolDiscriminator,
+            dsmccType,
+            messageId,
+            downloadId,
+        },
+        reader.subarray(messageLength - adaptationLength),
+    ];
+}
+
 export type DownloadInfoIndicationSection = {
     tableId: "DII";
     tableIdExtension: number;
@@ -665,7 +717,7 @@ export type DownloadInfoIndicationSection = {
     currentNextIndicator: boolean;
     sectionNumber: number;
     lastSectionNumber: number;
-    dsmccDownloadDataHeader: DSMCCDownloadDataHeader;
+    dsmccMessageHeader: DSMCCMessageHeader;
     downloadId: number;
     blockSize: number;
     windowSize: number;
@@ -673,14 +725,14 @@ export type DownloadInfoIndicationSection = {
     tCDownloadWindow: number;
     tCDownloadScenario: number;
     modules: DSMCCModule[];
-    privateData: Uint8Array;
+    privateDataDescriptors: DIIDescriptor[];
 };
 
 export type DSMCCModule = {
     moduleId: number;
     moduleSize: number;
     moduleVersion: number;
-    moduleInfo: Uint8Array;
+    moduleInfoDescriptors: DIIDescriptor[];
 };
 
 export type DownloadDataBlockSection = {
@@ -697,6 +749,180 @@ export type DownloadDataBlockSection = {
     blockData: Uint8Array;
 };
 
+export type DIIDescriptor =
+    | DIITypeDescriptor
+    | DIIEstDownloadTimeDescriptor
+    | DIICompressionTypeDescriptor
+    | DIIControlDescriptor
+    | DIIRootCertificateDescriptor
+    | DIIAribBxmlPrivateDataDescriptor;
+
+export type DIITypeDescriptor = {
+    tag: "type";
+    text: Uint8Array;
+};
+
+function readDIITypeDescriptor(buffer: Uint8Array): DIITypeDescriptor | undefined {
+    return {
+        tag: "type",
+        text: buffer.slice(),
+    };
+}
+
+export type DIIEstDownloadTimeDescriptor = {
+    tag: "estDownloadTime";
+    estDownloadTime: number;
+};
+
+function readDIIEstDownloadTimeDescriptor(
+    buffer: Uint8Array
+): DIIEstDownloadTimeDescriptor | undefined {
+    const reader = new BinaryReader(buffer);
+    if (!reader.canRead(4)) {
+        return undefined;
+    }
+    return {
+        tag: "estDownloadTime",
+        estDownloadTime: reader.readUint32(),
+    };
+}
+
+export type DIICompressionTypeDescriptor = {
+    tag: "compressionType";
+    compressionType: number;
+    originalSize: number;
+};
+
+function readDIICompressionTypeDescriptor(
+    buffer: Uint8Array
+): DIICompressionTypeDescriptor | undefined {
+    const reader = new BinaryReader(buffer);
+    if (!reader.canRead(5)) {
+        return undefined;
+    }
+    return {
+        tag: "compressionType",
+        compressionType: reader.readUint8(),
+        originalSize: reader.readUint32(),
+    };
+}
+
+export type DIIControlDescriptor = {
+    tag: "control";
+    controlData: Uint8Array;
+};
+
+function readDIIControlDescriptor(buffer: Uint8Array): DIIControlDescriptor | undefined {
+    return {
+        tag: "control",
+        controlData: buffer.slice(),
+    };
+}
+
+export type DIIRootCertificate = {
+    rootCertificateId: number;
+    rootCertificateVersion: number;
+};
+
+export type DIIRootCertificateDescriptor =
+    | {
+          tag: "rootCertificate";
+          isGenericRootCertificate: true;
+          rootCertificates: DIIRootCertificate[];
+      }
+    | {
+          tag: "rootCertificate";
+          isGenericRootCertificate: false;
+          reserved: Uint8Array;
+      };
+
+function readDIIRootCertificateDescriptor(
+    buffer: Uint8Array
+): DIIRootCertificateDescriptor | undefined {
+    const reader = new BinaryReader(buffer);
+    if (!reader.canRead(1)) {
+        return undefined;
+    }
+    const isGenericRootCertificate = !!(reader.readUint8() & 0x80);
+    if (isGenericRootCertificate) {
+        const rootCertificates: DIIRootCertificate[] = [];
+        while (reader.canRead(8)) {
+            rootCertificates.push({
+                rootCertificateId: reader.readUint32(),
+                rootCertificateVersion: reader.readUint32(),
+            });
+        }
+        return {
+            tag: "rootCertificate",
+            isGenericRootCertificate,
+            rootCertificates,
+        };
+    }
+    return {
+        tag: "rootCertificate",
+        isGenericRootCertificate,
+        reserved: reader.slice(),
+    };
+}
+
+export type DIIAribBxmlPrivateDataDescriptor = {
+    tag: "aribBxmlPrivateData";
+    returnToEntryFlag: boolean;
+};
+
+function readDIIAribBxmlPrivateDataDescriptor(
+    buffer: Uint8Array
+): DIIAribBxmlPrivateDataDescriptor | undefined {
+    const reader = new BinaryReader(buffer);
+    if (!reader.canRead(1)) {
+        return undefined;
+    }
+    return {
+        tag: "aribBxmlPrivateData",
+        returnToEntryFlag: !!(reader.readUint8() & 0x80),
+    };
+}
+
+function readDIIDescriptors(buffer: Uint8Array): DIIDescriptor[] {
+    const reader = new BinaryReader(buffer);
+    const descriptors: DIIDescriptor[] = [];
+    while (reader.canRead(2)) {
+        const tag = reader.readUint8();
+        const length = reader.readUint8();
+        if (!reader.canRead(length)) {
+            break;
+        }
+        const descriptor = reader.subarray(length);
+        let desc: DIIDescriptor | undefined = undefined;
+        switch (tag) {
+            case 0x01:
+                desc = readDIITypeDescriptor(descriptor);
+                break;
+            case 0x07:
+                desc = readDIIEstDownloadTimeDescriptor(descriptor);
+                break;
+            case 0xc2:
+                desc = readDIICompressionTypeDescriptor(descriptor);
+                break;
+            case 0xc3:
+                desc = readDIIControlDescriptor(descriptor);
+                break;
+            case 0xca:
+                desc = readDIIRootCertificateDescriptor(descriptor);
+                break;
+            case 0xf0:
+                desc = readDIIAribBxmlPrivateDataDescriptor(descriptor);
+                break;
+            default:
+                break;
+        }
+        if (desc != null) {
+            descriptors.push(desc);
+        }
+    }
+    return descriptors;
+}
+
 export function readDII(buffer: Uint8Array): DownloadInfoIndicationSection | undefined {
     const reader = new BinaryReader(buffer);
     if (!reader.canRead(2 + 1 + 1 + 1)) {
@@ -709,11 +935,11 @@ export function readDII(buffer: Uint8Array): DownloadInfoIndicationSection | und
     const sectionNumber = reader.readUint8();
     const lastSectionNumber = reader.readUint8();
 
-    const header = readDSMCCDownloadDataHeader(reader);
+    const header = readDSMCCMessageHeader(reader);
     if (header == null) {
         return undefined;
     }
-    const [dsmccDownloadDataHeader, message] = header;
+    const [dsmccMessageHeader, message] = header;
     const mreader = new BinaryReader(message);
     if (!mreader.canRead(4 + 2 + 1 + 1 + 4 + 4 + 2)) {
         return undefined;
@@ -746,12 +972,13 @@ export function readDII(buffer: Uint8Array): DownloadInfoIndicationSection | und
         if (!mreader.canRead(moduleInfoLength)) {
             return undefined;
         }
-        const moduleInfo = mreader.slice(moduleInfoLength);
+        const moduleInfo = mreader.subarray(moduleInfoLength);
+        const moduleInfoDescriptors = readDIIDescriptors(moduleInfo);
         modules.push({
             moduleId,
             moduleSize,
             moduleVersion,
-            moduleInfo,
+            moduleInfoDescriptors,
         });
     }
     if (!mreader.canRead(2)) {
@@ -761,7 +988,8 @@ export function readDII(buffer: Uint8Array): DownloadInfoIndicationSection | und
     if (!mreader.canRead(privateDataLength)) {
         return undefined;
     }
-    const privateData = mreader.slice(privateDataLength);
+    const privateData = mreader.subarray(privateDataLength);
+    const privateDataDescriptors = readDIIDescriptors(privateData);
     return {
         tableId: "DII",
         tableIdExtension,
@@ -769,7 +997,7 @@ export function readDII(buffer: Uint8Array): DownloadInfoIndicationSection | und
         currentNextIndicator,
         sectionNumber,
         lastSectionNumber,
-        dsmccDownloadDataHeader,
+        dsmccMessageHeader,
         downloadId,
         blockSize,
         windowSize,
@@ -777,7 +1005,7 @@ export function readDII(buffer: Uint8Array): DownloadInfoIndicationSection | und
         tCDownloadWindow,
         tCDownloadScenario,
         modules,
-        privateData,
+        privateDataDescriptors,
     };
 }
 
@@ -993,7 +1221,6 @@ function readStreamDescriptors(buffer: Uint8Array): StreamDescriptor[] {
                 desc = readGeneralEventDescriptor(descriptor);
                 break;
             default:
-                throw 1;
                 break;
         }
         if (desc != null) {
