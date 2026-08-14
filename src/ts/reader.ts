@@ -44,9 +44,6 @@ export class TSReader {
 
     private processPacket(offset: number, packet: Uint8Array) {
         const transportErrorIndicator = !!(packet[1] & 0x80);
-        if (transportErrorIndicator) {
-            return;
-        }
         const payloadUnitStartIndicator = !!(packet[1] & 0x40);
         const transportPriority = !!(packet[1] & 0x20);
         const pid = ((packet[1] << 8) | packet[2]) & 0x1fff;
@@ -70,7 +67,7 @@ export class TSReader {
             payloadOffset,
         };
         this.eventTarget?.dispatchEvent("packet", { offset, packet: tsPacket });
-        if (transportScramblingControl !== 0) {
+        if (transportErrorIndicator || transportScramblingControl !== 0) {
             return;
         }
         if (adaptationFieldControl !== 0b01 && adaptationFieldControl !== 0b11) {

@@ -18,10 +18,10 @@ export class PESReader {
     }
 
     *pushPacket(packet: TSPacket): Generator<Uint8Array> {
-        if (packet.transportErrorIndicator) {
+        if (packet.transportErrorIndicator || packet.transportScramblingControl !== 0) {
             return;
         }
-        if (packet.transportScramblingControl !== 0) {
+        if (packet.adaptationFieldControl !== 0b01 && packet.adaptationFieldControl !== 0b11) {
             return;
         }
         let buffer = this.buffer;
