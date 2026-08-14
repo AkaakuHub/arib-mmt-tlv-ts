@@ -21,7 +21,8 @@
         "./ts/si-descriptor.js": "./dist/ts/si-descriptor.js",
         "./ts/packet.js": "./dist/ts/packet.js",
         "./ts/event.js": "./dist/ts/event.js",
-        "./ts/si-text-decoder.js": "./dist/ts/si-text-decoder.js"
+        "./ts/si-text-decoder.js": "./dist/ts/si-text-decoder.js",
+        "./ts/pes-reader.js": "./dist/ts/pes-reader.js"
     },
     "files": [
         "dist",
