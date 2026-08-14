@@ -25,22 +25,13 @@ const controlCodes = {
 
 const eucJPDecoder = new TextDecoder("euc-jp");
 
-const graphics = {
+const graphicsFinalByte = {
     jis1: 0x39,
     jis2: 0x3a,
     alphabet: 0x4a,
     hiragana: 0x30,
     katakana: 0x31,
     symbols: 0x3b,
-} as const;
-
-const dbcs = {
-    [graphics.jis1]: true,
-    [graphics.jis2]: true,
-    [graphics.alphabet]: false,
-    [graphics.hiragana]: false,
-    [graphics.katakana]: false,
-    [graphics.symbols]: true,
 } as const;
 
 const hiragana = Array.from({
@@ -106,12 +97,15 @@ const alphabet = Array.from({
     length: 95,
 });
 
-type Graphics = (typeof graphics)[keyof typeof graphics];
+type GraphicsSet = {
+    finalByte: number;
+    dbcs: boolean;
+};
 
 type Size = typeof controlCodes.MSZ | typeof controlCodes.NSZ;
 
 type DecoderState = {
-    graphicsSet: [Graphics, Graphics, Graphics, Graphics];
+    graphicsSet: [GraphicsSet, GraphicsSet, GraphicsSet, GraphicsSet];
     graphicsLeft: number;
     graphicsRight: number;
     size: Size;
@@ -134,61 +128,55 @@ function decodeESC(state: DecoderState, data: Uint8Array, i: number): number {
         return i;
     }
     const finalByte = data[i];
-    if (finalByte >= controlCodes.ESC_FINAL_BEGIN && finalByte <= controlCodes.ESC_FINAL_END) {
-        i++;
-        switch (finalByte) {
-            case 0x6e: // LS2
-                if (intermediateBytes.length === 0) {
-                    state.graphicsLeft = 2;
-                }
+    if (finalByte < controlCodes.ESC_FINAL_BEGIN || finalByte > controlCodes.ESC_FINAL_END) {
+        return i;
+    }
+    i++;
+    switch (finalByte) {
+        case 0x6e: // LS2
+            if (intermediateBytes.length === 0) {
+                state.graphicsLeft = 2;
+            }
+            break;
+        case 0x6f: // LS3
+            if (intermediateBytes.length === 0) {
+                state.graphicsLeft = 3;
+            }
+            break;
+        case 0x7e: // LS1R
+            if (intermediateBytes.length === 0) {
+                state.graphicsRight = 1;
+            }
+            break;
+        case 0x7d: // LS2R
+            if (intermediateBytes.length === 0) {
+                state.graphicsRight = 2;
+            }
+            break;
+        case 0x7c: // LS3R
+            if (intermediateBytes.length === 0) {
+                state.graphicsRight = 3;
+            }
+            break;
+        default:
+            if (
+                intermediateBytes.length === 1 &&
+                intermediateBytes[0] >= 0x28 &&
+                intermediateBytes[0] <= 0x2b
+            ) {
+                state.graphicsSet[intermediateBytes[0] - 0x28] = { finalByte, dbcs: false };
+            } else if (intermediateBytes.length === 1 && intermediateBytes[0] === 0x24) {
+                state.graphicsSet[0] = { finalByte, dbcs: true };
                 break;
-            case 0x6f: // LS3
-                if (intermediateBytes.length === 0) {
-                    state.graphicsLeft = 3;
-                }
-                break;
-            case 0x7e: // LS1R
-                if (intermediateBytes.length === 0) {
-                    state.graphicsRight = 1;
-                }
-                break;
-            case 0x7d: // LS2R
-                if (intermediateBytes.length === 0) {
-                    state.graphicsRight = 2;
-                }
-                break;
-            case 0x7c: // LS3R
-                if (intermediateBytes.length === 0) {
-                    state.graphicsRight = 3;
-                }
-                break;
-            case graphics.alphabet:
-            case graphics.hiragana:
-            case graphics.katakana:
-                if (
-                    intermediateBytes.length === 1 &&
-                    intermediateBytes[0] >= 0x28 &&
-                    intermediateBytes[0] <= 0x2b
-                ) {
-                    state.graphicsSet[intermediateBytes[0] - 0x28] = finalByte;
-                }
-                break;
-            case graphics.jis1:
-            case graphics.jis2:
-            case graphics.symbols:
-                if (intermediateBytes.length === 1 && intermediateBytes[0] === 0x24) {
-                    state.graphicsSet[0] = finalByte;
-                    break;
-                } else if (
-                    intermediateBytes.length === 2 &&
-                    intermediateBytes[0] === 0x24 &&
-                    intermediateBytes[1] >= 0x29 &&
-                    intermediateBytes[1] <= 0x2b
-                ) {
-                    state.graphicsSet[intermediateBytes[1] - 0x28] = finalByte;
-                }
-                break;
-        }
+            } else if (
+                intermediateBytes.length === 2 &&
+                intermediateBytes[0] === 0x24 &&
+                intermediateBytes[1] >= 0x29 &&
+                intermediateBytes[1] <= 0x2b
+            ) {
+                state.graphicsSet[intermediateBytes[1] - 0x28] = { finalByte, dbcs: true };
+            }
+            break;
     }
     return i;
 }
@@ -243,9 +231,9 @@ function flush(state: DecoderState) {
     state.result += b;
 }
 
-function writeSBCS(state: DecoderState, g: Graphics, first: number) {
-    switch (g) {
-        case graphics.alphabet:
+function writeSBCS(state: DecoderState, g: GraphicsSet, first: number) {
+    switch (g.finalByte) {
+        case graphicsFinalByte.alphabet:
             if (state.size === controlCodes.MSZ) {
                 writeASCII(state, first + 0x20);
             } else {
@@ -259,7 +247,7 @@ function writeSBCS(state: DecoderState, g: Graphics, first: number) {
                 }
             }
             break;
-        case graphics.hiragana: {
+        case graphicsFinalByte.hiragana: {
             const a = hiragana[first];
             if (a != null) {
                 if (a.length === 2) {
@@ -270,7 +258,7 @@ function writeSBCS(state: DecoderState, g: Graphics, first: number) {
             }
             break;
         }
-        case graphics.katakana: {
+        case graphicsFinalByte.katakana: {
             const a = katakana[first];
             if (a != null) {
                 if (a.length === 2) {
@@ -284,9 +272,9 @@ function writeSBCS(state: DecoderState, g: Graphics, first: number) {
     }
 }
 
-function writeDBCS(state: DecoderState, g: Graphics, first: number, second: number) {
-    switch (g) {
-        case graphics.jis1:
+function writeDBCS(state: DecoderState, g: GraphicsSet, first: number, second: number) {
+    switch (g.finalByte) {
+        case graphicsFinalByte.jis1:
             if (state.size === controlCodes.MSZ && first === 1 && second === 1) {
                 writeASCII(state, 0x20);
             } else if (state.size === controlCodes.MSZ && first === 3) {
@@ -295,18 +283,24 @@ function writeDBCS(state: DecoderState, g: Graphics, first: number, second: numb
                 writeJIS(state, first, second);
             }
             break;
-        case graphics.symbols:
+        case graphicsFinalByte.symbols:
             writeUnicode(state, symbolUnicode.get(((first + 0x20) << 8) | (second + 0x20)) ?? "");
             break;
     }
 }
 
-function decodeCharacter(state: DecoderState, data: Uint8Array, i: number): number {
+function decodeCharacter(
+    state: DecoderState,
+    data: Uint8Array,
+    i: number,
+    graphicsLeft: number,
+    graphicsRight: number
+): number {
     const c = data[i];
     i++;
     if (c >= 0x21 && c <= 0x7e) {
         const first = (c & 0x7f) - 0x20;
-        if (dbcs[state.graphicsSet[state.graphicsLeft]]) {
+        if (state.graphicsSet[graphicsLeft].dbcs) {
             if (data.length <= i) {
                 return i;
             }
@@ -315,13 +309,13 @@ function decodeCharacter(state: DecoderState, data: Uint8Array, i: number): numb
                 return i;
             }
             i++;
-            writeDBCS(state, state.graphicsSet[state.graphicsLeft], first, second);
+            writeDBCS(state, state.graphicsSet[graphicsLeft], first, second);
         } else {
-            writeSBCS(state, state.graphicsSet[state.graphicsLeft], first);
+            writeSBCS(state, state.graphicsSet[graphicsLeft], first);
         }
     } else if (c >= 0xa1 && c <= 0xfe) {
         const first = (c & 0x7f) - 0x20;
-        if (dbcs[state.graphicsSet[state.graphicsRight]]) {
+        if (state.graphicsSet[state.graphicsRight].dbcs) {
             if (data.length <= i) {
                 return i;
             }
@@ -330,9 +324,9 @@ function decodeCharacter(state: DecoderState, data: Uint8Array, i: number): numb
                 return i;
             }
             i++;
-            writeDBCS(state, state.graphicsSet[state.graphicsRight], first, second);
+            writeDBCS(state, state.graphicsSet[graphicsRight], first, second);
         } else {
-            writeSBCS(state, state.graphicsSet[state.graphicsRight], first);
+            writeSBCS(state, state.graphicsSet[graphicsRight], first);
         }
     }
     return i;
@@ -340,7 +334,12 @@ function decodeCharacter(state: DecoderState, data: Uint8Array, i: number): numb
 
 export function decodeSIText(data: Uint8Array): string {
     const state: DecoderState = {
-        graphicsSet: [graphics.jis1, graphics.alphabet, graphics.hiragana, graphics.katakana],
+        graphicsSet: [
+            { finalByte: graphicsFinalByte.jis1, dbcs: true },
+            { finalByte: graphicsFinalByte.alphabet, dbcs: false },
+            { finalByte: graphicsFinalByte.hiragana, dbcs: false },
+            { finalByte: graphicsFinalByte.katakana, dbcs: false },
+        ],
         graphicsLeft: 0,
         graphicsRight: 2,
         size: controlCodes.NSZ,
@@ -371,17 +370,11 @@ export function decodeSIText(data: Uint8Array): string {
                 writeASCII(state, 10);
                 break;
             case controlCodes.SS2: {
-                const { graphicsLeft } = state;
-                state.graphicsLeft = 2;
-                i = decodeCharacter(state, data, i);
-                state.graphicsLeft = graphicsLeft;
+                i = decodeCharacter(state, data, i, 2, state.graphicsRight);
                 continue;
             }
             case controlCodes.SS3: {
-                const { graphicsLeft } = state;
-                state.graphicsLeft = 3;
-                i = decodeCharacter(state, data, i);
-                state.graphicsLeft = graphicsLeft;
+                i = decodeCharacter(state, data, i, 3, state.graphicsRight);
                 continue;
             }
             case controlCodes.SP:
@@ -392,7 +385,7 @@ export function decodeSIText(data: Uint8Array): string {
                 }
                 break;
             default:
-                i = decodeCharacter(state, data, i - 1);
+                i = decodeCharacter(state, data, i - 1, state.graphicsLeft, state.graphicsRight);
                 break;
         }
     }
