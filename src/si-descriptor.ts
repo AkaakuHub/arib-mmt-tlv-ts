@@ -132,7 +132,7 @@ export function readSatelliteDeliverySystemDescriptor(
         westEastFlag: !!(view.getUint8(6) & 0x80),
         polarization: (view.getUint8(6) & 0x60) >> 5,
         modulation: view.getUint8(6) & 0x1f,
-        symbolRate: view.getUint32(7) >> 4,
+        symbolRate: view.getUint32(7) >>> 4,
         fecInner: view.getUint32(7) & 0xf,
     };
 }
