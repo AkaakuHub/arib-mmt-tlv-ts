@@ -122,6 +122,9 @@ export class TSReader {
         }
         this.buffer = this.buffer.slice(packetOffset);
     }
+    pushSection(pid: number, payload: Uint8Array) {
+        this.sectionReader.pushSection(pid, payload);
+    }
 }
 
 function resync(
