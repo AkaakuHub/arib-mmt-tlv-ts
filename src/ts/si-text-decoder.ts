@@ -26,6 +26,7 @@ const controlCodes = {
 const eucJPDecoder = new TextDecoder("euc-jp");
 
 const graphicsFinalByte = {
+    kanji: 0x42,
     jis1: 0x39,
     jis2: 0x3a,
     alphabet: 0x4a,
@@ -171,7 +172,7 @@ function decodeESC(state: DecoderState, data: Uint8Array, i: number): number {
             } else if (
                 intermediateBytes.length === 2 &&
                 intermediateBytes[0] === 0x24 &&
-                intermediateBytes[1] >= 0x29 &&
+                intermediateBytes[1] >= 0x28 &&
                 intermediateBytes[1] <= 0x2b
             ) {
                 state.graphicsSet[intermediateBytes[1] - 0x28] = { finalByte, dbcs: true };
@@ -274,6 +275,7 @@ function writeSBCS(state: DecoderState, g: GraphicsSet, first: number) {
 
 function writeDBCS(state: DecoderState, g: GraphicsSet, first: number, second: number) {
     switch (g.finalByte) {
+        case graphicsFinalByte.kanji:
         case graphicsFinalByte.jis1:
             if (state.size === controlCodes.MSZ && first === 1 && second === 1) {
                 writeASCII(state, 0x20);
